@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#1C060B; --ink:#F8EEE9; --mute:#B79A9E; --line:rgba(248,238,233,.16);
+  --accent:#E23B4E; --accent-ink:#fff; --pick:#FFA27F; --err:#FF8A8F;
+  --serif:"Fraunces","Bitstream Charter",Georgia,serif;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{min-height:100vh;background:var(--bg);color:var(--ink);font-family:var(--sans);
+  background-image:radial-gradient(800px 600px at 100% 0%,rgba(190,30,55,.30),transparent 60%),
+                   radial-gradient(700px 700px at 0% 100%,rgba(120,20,40,.32),transparent 60%);
+  background-attachment:fixed;line-height:1.45}
+main{max-width:640px;margin:0 auto;padding:44px 22px 140px}
+h1{font-family:var(--serif);font-weight:500;font-size:clamp(38px,9vw,54px);line-height:1.05;letter-spacing:-.5px}
+.lede{margin-top:14px;color:var(--mute);font-size:17px}
+h2{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.2px}
+.pos{margin-top:44px;padding-top:26px;border-top:1px solid var(--line)}
+.pos small{display:block;margin-top:4px;color:var(--mute);font-size:14px}
+.opts{margin-top:18px;display:flex;flex-direction:column;gap:10px}
+.opt{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:16px;width:100%;padding:16px 18px;
+  border:1.5px solid var(--line);border-radius:14px;cursor:pointer;transition:border-color .15s,background .15s}
+.opt:hover{border-color:rgba(248,238,233,.4)}
+.opt:focus-visible{outline:2px solid var(--pick);outline-offset:2px}
+.opt .dot{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--mute);display:grid;place-items:center}
+.opt[aria-checked="true"]{border-color:var(--pick);background:rgba(255,162,127,.09)}
+.opt[aria-checked="true"] .dot{border-color:var(--pick)}
+.opt[aria-checked="true"] .dot::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--pick)}
+.opt b{display:block;font-size:19px;font-weight:600;letter-spacing:-.2px}
+.opt span.t{display:block;margin-top:2px;color:var(--mute);font-size:14.5px}
+.opt.abs b{font-weight:500;color:var(--mute);font-size:16px}
+label{display:block;margin-top:26px;font-size:14px;font-weight:600;color:var(--mute)}
+input{width:100%;margin-top:8px;padding:16px 18px;font:inherit;font-size:18px;color:var(--ink);background:rgba(248,238,233,.06);
+  border:1.5px solid var(--line);border-radius:14px;outline:none}
+input:focus{border-color:var(--pick)}
+.btn{all:unset;box-sizing:border-box;display:block;width:100%;margin-top:30px;padding:17px;text-align:center;font:600 18px var(--sans);
+  background:var(--accent);color:var(--accent-ink);border-radius:14px;cursor:pointer}
+.btn:focus-visible{outline:2px solid var(--pick);outline-offset:3px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.err{margin-top:16px;color:var(--err);font-size:15px;min-height:1px}
+.note{margin-top:22px;color:var(--mute);font-size:14px}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:14px 22px calc(14px + env(safe-area-inset-bottom));
+  background:linear-gradient(to top,var(--bg) 70%,transparent);}
+.bar .in{max-width:640px;margin:0 auto}
+.bar .btn{margin-top:0}
+.sum{margin-top:30px}
+.sum div{display:flex;justify-content:space-between;gap:20px;padding:16px 0;border-top:1px solid var(--line)}
+.sum div:last-child{border-bottom:1px solid var(--line)}
+.sum span{color:var(--mute)}
+.sum b{text-align:right;font-weight:600}
+.who{margin-top:22px;color:var(--mute);font-size:15px}
+.big{font-family:var(--serif);font-size:clamp(34px,8vw,46px);line-height:1.1;margin-top:8px}
+.ref{margin-top:28px;padding:20px;border:1.5px dashed var(--line);border-radius:14px}
+.ref small{color:var(--mute);display:block}
+.ref code{display:block;margin-top:6px;font:600 28px/1 var(--sans);letter-spacing:4px;font-variant-numeric:tabular-nums}
+.back{all:unset;cursor:pointer;color:var(--mute);font-size:15px;margin-bottom:26px;display:inline-block}
+.back:focus-visible{outline:2px solid var(--pick)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main id="app" aria-live="polite"><p class="lede">Loading…</p></main>
+
+<script>
+const app = document.getElementById("app");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let cfg = null, step = "id";
+const me = { name: "", studentNo: "", choices: {}, ref: "" };
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  let data = {};
+  try { data = await r.json(); } catch {}
+  if (!r.ok) throw new Error(data.error || "Something went wrong. Please try again.");
+  return data;
+}
+
+function render() {
+  if (!cfg) return;
+  document.title = cfg.title;
+  if (cfg.status !== "open" && step !== "done") return renderClosed();
+  ({ id: renderId, ballot: renderBallot, review: renderReview, done: renderDone })[step]();
+  window.scrollTo(0, 0);
+}
+
+function renderClosed() {
+  app.innerHTML = `<h1>${esc(cfg.title)}</h1>
+    <p class="big" style="margin-top:34px">Voting is closed.</p>
+    <p class="lede">Thank you for your interest. Results will be announced by the organizers.</p>`;
+}
+
+function renderId() {
+  app.innerHTML = `<h1>${esc(cfg.title)}</h1>
+    <p class="lede">${esc(cfg.description)}</p>
+    <label for="name">Full name</label>
+    <input id="name" autocomplete="name" placeholder="Juan Dela Cruz" value="${esc(me.name)}">
+    <label for="sn">Student number</label>
+    <input id="sn" inputmode="numeric" autocomplete="off" placeholder="2024101159" value="${esc(me.studentNo)}">
+    <p class="err" id="err" role="alert"></p>
+    <button class="btn" id="go">Continue to ballot</button>
+    <p class="note">One vote per student number. You can only vote once.</p>`;
+  const go = document.getElementById("go"), err = document.getElementById("err");
+  const submit = async () => {
+    me.name = document.getElementById("name").value.trim().replace(/\s+/g, " ");
+    me.studentNo = document.getElementById("sn").value.trim();
+    err.textContent = "";
+    if (me.name.length < 2) return err.textContent = "Enter your full name.";
+    if (!/^\d{6,12}$/.test(me.studentNo)) return err.textContent = "Enter a valid student number (digits only).";
+    go.disabled = true; go.textContent = "Checking…";
+    try {
+      const c = await api("/api/check?studentNo=" + encodeURIComponent(me.studentNo));
+      if (!c.allowed) throw new Error("This student number is not on the voter list.");
+      if (c.voted) throw new Error("This student number has already voted.");
+      step = "ballot"; render();
+    } catch (e) {
+      err.textContent = e.message; go.disabled = false; go.textContent = "Continue to ballot";
+    }
+  };
+  go.onclick = submit;
+  app.querySelectorAll("input").forEach(i => i.onkeydown = e => { if (e.key === "Enter") submit(); });
+}
+
+function renderBallot() {
+  const total = cfg.positions.length;
+  const done = () => cfg.positions.filter(p => me.choices[p.id]).length;
+  app.innerHTML = `<h1>Your ballot</h1>
+    <p class="who">Voting as ${esc(me.name)} · ${esc(me.studentNo)}</p>
+    ${cfg.positions.map(p => `
+      <section class="pos" data-pos="${esc(p.id)}">
+        <h2>${esc(p.title)}</h2><small>Choose one</small>
+        <div class="opts" role="radiogroup" aria-label="${esc(p.title)}">
+          ${p.candidates.map(c => opt(p.id, c.id, c.name, c.tagline)).join("")}
+          ${opt(p.id, "abstain", "Abstain", "", true)}
+        </div>
+      </section>`).join("")}
+    <div class="bar"><div class="in"><button class="btn" id="next" disabled></button></div></div>`;
+  const next = document.getElementById("next");
+  const refresh = () => {
+    const d = done();
+    next.disabled = d < total;
+    next.textContent = d < total ? `${d} of ${total} positions chosen` : "Review ballot";
+    app.querySelectorAll(".opt").forEach(o => {
+      o.setAttribute("aria-checked", me.choices[o.dataset.p] === o.dataset.c ? "true" : "false");
+    });
+  };
+  app.querySelectorAll(".opt").forEach(o => o.onclick = () => { me.choices[o.dataset.p] = o.dataset.c; refresh(); });
+  next.onclick = () => { step = "review"; render(); };
+  refresh();
+}
+function opt(p, c, name, tag, abs) {
+  return `<button type="button" class="opt${abs ? " abs" : ""}" role="radio" aria-checked="false" data-p="${esc(p)}" data-c="${esc(c)}">
+    <span class="dot"></span><span><b>${esc(name)}</b>${tag ? `<span class="t">${esc(tag)}</span>` : ""}</span></button>`;
+}
+
+function labelFor(p) {
+  const id = me.choices[p.id];
+  if (id === "abstain") return "Abstain";
+  return p.candidates.find(c => c.id === id)?.name || "—";
+}
+
+function renderReview() {
+  app.innerHTML = `<button class="back" id="back">← Edit ballot</button>
+    <h1>Review and submit</h1>
+    <p class="lede">Voting as ${esc(me.name)} (${esc(me.studentNo)}). Once you submit, you can’t change your vote.</p>
+    <div class="sum">${cfg.positions.map(p => `<div><span>${esc(p.title)}</span><b>${esc(labelFor(p))}</b></div>`).join("")}</div>
+    <p class="err" id="err" role="alert"></p>
+    <button class="btn" id="submit">Submit my vote</button>`;
+  document.getElementById("back").onclick = () => { step = "ballot"; render(); };
+  const btn = document.getElementById("submit"), err = document.getElementById("err");
+  btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = "Submitting…"; err.textContent = "";
+    try {
+      const r = await api("/api/vote", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: me.name, studentNo: me.studentNo, choices: me.choices })
+      });
+      me.ref = r.ref; step = "done"; render();
+    } catch (e) {
+      err.textContent = e.message; btn.disabled = false; btn.textContent = "Submit my vote";
+    }
+  };
+}
+
+function renderDone() {
+  app.innerHTML = `<h1>${esc(cfg.title)}</h1>
+    <p class="big" style="margin-top:34px">Your vote is in.</p>
+    <p class="lede">Thank you, ${esc(me.name.split(" ")[0])}. Your ballot has been recorded.</p>
+    <div class="ref"><small>Confirmation code</small><code>${esc(me.ref)}</code></div>
+    <p class="note">Screenshot this code if you want proof that you voted. It doesn’t show who you voted for.</p>`;
+}
+
+(async () => {
+  try { cfg = await api("/api/config"); render(); }
+  catch (e) { app.innerHTML = `<h1>Something’s wrong</h1><p class="lede">${esc(e.message)}</p>`; }
+})();
+</script>
+</body>
+</html>
